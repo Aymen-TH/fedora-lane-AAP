@@ -1,0 +1,21 @@
+---
+# Project identification
+project_name: FedoraLane
+managed_by: AAP
+owner: Administrator
+
+ssh_port: 2222
+http_port: 35443
+
+# Public access
+allowed_ssh_cidr: 0.0.0.0/0
+allowed_http_cidr: 0.0.0.0/0
+
+# Resource ownership tags
+aws_resource_tags:
+  Project: "{{ project_name }}"
+  ManagedBy: "{{ managed_by }}"
+  Environment: "{{ deployment_environment }}"
+  Owner: "{{ owner }}"
+
+

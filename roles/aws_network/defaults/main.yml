@@ -1,0 +1,30 @@
+---
+
+# AWS configuration
+aws_region: eu-north-1
+
+#VPC
+vpc_name: fedora-lane-vpc
+vpc_cidr: 10.20.0.0/16
+aws_vpc_state: present
+
+
+# Subnet
+subnet_name: fedora-lane-public-subnet
+subnet_cidr: 10.20.1.0/24
+aws_subnet_map_public_ip: true
+
+# Internet Gateway
+aws_igw_state: present
+
+# Route table
+aws_route_table_state: present
+
+# Security Group
+aws_security_group_state: present
+
+# Outbound traffic
+aws_allow_all_egress: true
+
+# Temporary SSH access for initial RHEL provisioning
+aws_bootstrap_ssh_port: 22

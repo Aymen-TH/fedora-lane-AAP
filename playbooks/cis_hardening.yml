@@ -1,0 +1,79 @@
+---
+- name: Apply official RHEL 10 CIS Level 1 Server baseline
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    cis_profile_id: xccdf_org.ssgproject.content_profile_cis_server_l1
+    scap_datastream: /usr/share/xml/scap/ssg/content/ssg-rhel10-ds.xml
+    cis_remediation_report: /var/tmp/cis-l1-remediation-report.html
+    cis_report_path: /var/tmp/cis-l1-report.html
+
+  tasks:
+    - name: Verify target is RHEL 10
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "RedHat"
+          - ansible_distribution_major_version == "10"
+        fail_msg: "This CIS playbook is intended for RHEL 10 hosts."
+
+    - name: Install OpenSCAP and SCAP Security Guide
+      ansible.builtin.dnf:
+        name:
+          - scap-security-guide
+          - openscap-scanner
+        state: present
+        use_backend: dnf4
+
+    - name: Verify SCAP data stream exists
+      ansible.builtin.stat:
+        path: "{{ scap_datastream }}"
+      register: scap_datastream_file
+
+    - name: Assert SCAP data stream exists
+      ansible.builtin.assert:
+        that: scap_datastream_file.stat.exists
+        fail_msg: "SCAP data stream was not found on the target host."
+
+    - name: Apply CIS Level 1 Server remediation
+      ansible.builtin.command:
+        argv:
+          - oscap
+          - xccdf
+          - eval
+          - --profile
+          - "{{ cis_profile_id }}"
+          - --remediate
+          - --report
+          - "{{ cis_remediation_report }}"
+          - "{{ scap_datastream }}"
+      register: cis_remediation
+      async: 3600
+      poll: 15
+      changed_when: true
+      failed_when: cis_remediation.rc not in [0, 2]
+
+    - name: Re-scan to verify compliance
+      ansible.builtin.command:
+        argv:
+          - oscap
+          - xccdf
+          - eval
+          - --profile
+          - "{{ cis_profile_id }}"
+          - --report
+          - "{{ cis_report_path }}"
+          - "{{ scap_datastream }}"
+      register: cis_scan
+      async: 1800
+      poll: 15
+      changed_when: false
+      failed_when: cis_scan.rc not in [0, 2]
+
+    - name: Display compliance summary
+      ansible.builtin.debug:
+        msg:
+          - "Remediation rc: {{ cis_remediation.rc }}"
+          - "Scan rc: {{ cis_scan.rc }} (0 = fully compliant, 2 = some rules still failing)"
+          - "Report: {{ cis_report_path }}"
