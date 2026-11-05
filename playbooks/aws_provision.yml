@@ -1,0 +1,10 @@
+
+---
+- name: Provision Fedora Lane RHEL 10 EC2 instances
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  roles:
+    - role: aws_provision

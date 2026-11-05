@@ -1,0 +1,28 @@
+---
+plugin: amazon.aws.aws_ec2
+
+regions:
+  - eu-north-1
+
+# Discover only Fedora Lane instances.
+filters:
+  instance-state-name: running
+  "tag:Project": FedoraLane
+
+# Use the public IP address to connect.
+hostnames:
+  - ip-address
+
+compose:
+  ansible_host: public_ip_address
+  ansible_user: "'ec2-user'"
+  ansible_port: "22"
+
+# Organize discovered hosts by their AWS tags.
+keyed_groups:
+  - key: tags.Environment
+    prefix: env
+  - key: tags.Project
+    prefix: project
+    
+

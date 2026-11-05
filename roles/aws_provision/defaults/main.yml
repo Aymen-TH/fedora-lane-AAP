@@ -1,0 +1,20 @@
+---
+# RHEL 10 x86_64 AMI in eu-north-1
+aws_ami_id: ami-05ef724ee3f68a8fb
+
+# EC2 configuration
+aws_instance_type: t3.micro
+aws_instance_name_prefix: fedora-lane-rhel
+
+# AWS EC2 Key Pair
+aws_key_pair_name: fedora-lane-automation
+
+# Root EBS volume
+aws_root_volume_size: 20
+aws_root_volume_type: gp3
+
+# Public IP
+aws_assign_public_ip: true
+
+# Instance state
+aws_instance_state: running
