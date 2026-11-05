@@ -1,0 +1,62 @@
+
+---
+- name: Configure PostgreSQL application database
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    postgres_admin_user: postgres
+    postgres_admin_db: postgres
+    postgres_admin_host: 127.0.0.1
+    postgres_admin_port: 5432
+
+    application_db_name: "{{ onboarding_db_name }}"
+    application_db_user: "{{ requester_username | lower | regex_replace('-', '_') }}"
+
+    postgres_admin_password: "{{ lookup('env', 'POSTGRES_ADMIN_PASSWORD') }}"
+
+  tasks:
+    - name: Install PostgreSQL Python driver
+      ansible.builtin.dnf:
+        name: python3-psycopg2
+        state: present
+
+    - name: Create application database user
+      community.postgresql.postgresql_user:
+        name: "{{ application_db_user }}"
+        state: present
+        login_host: "{{ postgres_admin_host }}"
+        login_port: "{{ postgres_admin_port }}"
+        login_user: "{{ postgres_admin_user }}"
+        login_password: "{{ postgres_admin_password }}"
+        login_db: "{{ postgres_admin_db }}"
+     # no_log: true
+
+    - name: Create application database
+      community.postgresql.postgresql_db:
+        name: "{{ application_db_name }}"
+        owner: "{{ application_db_user }}"
+        state: present
+        login_host: "{{ postgres_admin_host }}"
+        login_port: "{{ postgres_admin_port }}"
+        login_user: "{{ postgres_admin_user }}"
+        login_password: "{{ postgres_admin_password }}"
+        maintenance_db: "{{ postgres_admin_db }}"
+     # no_log: true
+
+    - name: Verify application database exists
+      community.postgresql.postgresql_info:
+        login_host: "{{ postgres_admin_host }}"
+        login_port: "{{ postgres_admin_port }}"
+        login_user: "{{ postgres_admin_user }}"
+        login_password: "{{ postgres_admin_password }}"
+        login_db: "{{ application_db_name }}"
+        filter:
+          - databases
+      register: postgres_verification
+      # no_log: true
+
+    - name: Report database configuration
+      ansible.builtin.debug:
+        msg: "PostgreSQL database {{ application_db_name }} has been configured."

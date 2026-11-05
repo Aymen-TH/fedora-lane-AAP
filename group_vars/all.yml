@@ -1,0 +1,36 @@
+---
+# Project identification
+project_name: FedoraLane
+managed_by: AAP
+deployment_environment: dev
+owner: fedora-lane
+
+# AWS configuration
+aws_region: eu-north-1
+
+# Network configuration
+vpc_name: fedora-lane-vpc
+vpc_cidr: 10.20.0.0/16
+
+subnet_name: fedora-lane-public-subnet
+subnet_cidr: 10.20.1.0/24
+
+# Security group
+security_group_name: fedora-lane-SG
+
+ssh_port: 2222
+http_port: 35443
+
+# Public access
+allowed_ssh_cidr: 0.0.0.0/0
+allowed_http_cidr: 0.0.0.0/0
+
+# Resource ownership tags
+aws_resource_tags:
+  Project: "{{ project_name }}"
+  ManagedBy: "{{ managed_by }}"
+  Environment: "{{ deployment_environment }}"
+  Owner: "{{ owner }}"
+
+# Desired VM count
+aws_instance_count: 2

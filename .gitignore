@@ -2,7 +2,6 @@
 *.retry
 *.log
 artifacts/
-collections/
 roles_downloaded/
 
 # Secrets

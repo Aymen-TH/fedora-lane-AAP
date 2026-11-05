@@ -1,0 +1,12 @@
+
+---
+- name: Destroy Fedora Lane AWS environment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - ../group_vars/all.yml
+
+  roles:
+    - role: aws_cleanup

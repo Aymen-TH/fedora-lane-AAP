@@ -1,0 +1,70 @@
+
+---
+- name: Validate Fedora Lane onboarding request
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Ensure requester username is provided
+      ansible.builtin.assert:
+        that:
+          - requester_username is defined
+          - requester_username | string | trim | length > 0
+        fail_msg: "Requester username is required."
+        success_msg: "Requester username is valid."
+
+    - name: Ensure project name is provided
+      ansible.builtin.assert:
+        that:
+          - onboarding_project_name is defined
+          - onboarding_project_name | string | trim | length > 0
+        fail_msg: "Project name is required."
+
+    - name: Validate GitLab project name format
+      ansible.builtin.assert:
+        that:
+          - onboarding_project_name is match('^[a-zA-Z0-9][a-zA-Z0-9 _.-]{0,99}$')
+        fail_msg: >-
+          Project name must start with a letter or number and contain only
+          letters, numbers, spaces, underscores, periods, or hyphens.
+
+    - name: Ensure GitLab project path is provided
+      ansible.builtin.assert:
+        that:
+          - onboarding_project_path is defined
+          - onboarding_project_path | string | trim | length > 0
+        fail_msg: "GitLab project path is required."
+
+    - name: Validate GitLab project path format
+      ansible.builtin.assert:
+        that:
+          - onboarding_project_path is match('^[a-z0-9][a-z0-9_-]{0,254}$')
+        fail_msg: >-
+          Project path must be lowercase and contain only letters,
+          numbers, underscores, and hyphens.
+
+    - name: Ensure database name is provided
+      ansible.builtin.assert:
+        that:
+          - onboarding_db_name is defined
+          - onboarding_db_name | string | trim | length > 0
+        fail_msg: "Database name is required."
+
+    - name: Validate PostgreSQL database name
+      ansible.builtin.assert:
+        that:
+          - onboarding_db_name is match('^[a-z][a-z0-9_]{0,62}$')
+        fail_msg: >-
+          Database name must start with a lowercase letter and contain
+          only lowercase letters, numbers, and underscores (maximum 63 characters).
+
+
+    - name: Display validation result
+      ansible.builtin.debug:
+        msg: >-
+          Onboarding request validated successfully.
+          Requester: {{ requester_username }}
+          Project: {{ onboarding_project_name }}
+          GitLab path: {{ onboarding_project_path }}
+          Database: {{ onboarding_db_name }}

@@ -1,0 +1,17 @@
+---
+plugin: amazon.aws.aws_ec2
+
+regions:
+  - eu-north-1
+
+filters:
+  instance-state-name: running
+  "tag:Name": postgres
+
+hostnames:
+  - ip-address
+
+compose:
+  ansible_host: public_ip_address
+  ansible_user: "'ec2-user'"
+  ansible_port: "22"

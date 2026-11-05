@@ -1,0 +1,104 @@
+
+---
+- name: Create Fedora Lane onboarding project in GitLab and grant requester access
+  hosts: all
+  connection: local
+  gather_facts: true
+
+  vars:
+    gitlab_api_url: "https://gitlab.com/api/v4"
+
+    # Temporary test values
+    project_name: "{{ onboarding_project_name }}"
+    project_path: "{{ onboarding_project_path }}"
+    requester_username: "{{ requester_username }}"
+
+  tasks:
+    - name: Check whether the project already exists
+      ansible.builtin.uri:
+        url: "{{ gitlab_api_url }}/projects?search={{ project_path | urlencode }}&owned=true&simple=true"
+        method: GET
+        headers:
+          PRIVATE-TOKEN: "{{ gitlab_token }}"
+        return_content: true
+        status_code: 200
+      register: gitlab_projects
+      no_log: true
+
+    - name: Identify the existing project
+      ansible.builtin.set_fact:
+        existing_project: >-
+          {{
+            gitlab_projects.json
+            | selectattr('path', 'equalto', project_path)
+            | list
+            | first
+            | default({})
+          }}
+
+    - name: Create private project
+      ansible.builtin.uri:
+        url: "{{ gitlab_api_url }}/projects"
+        method: POST
+        headers:
+          PRIVATE-TOKEN: "{{ gitlab_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: "{{ project_name }}"
+          path: "{{ project_path }}"
+          visibility: "private"
+          initialize_with_readme: true
+        status_code: 201
+        return_content: true
+      register: created_project
+      when: existing_project | length == 0
+      no_log: true
+
+    - name: Capture GitLab project ID
+      ansible.builtin.set_fact:
+        gitlab_project_id: >-
+          {{
+            created_project.json.id
+            if created_project is not skipped
+            else existing_project.id
+          }}
+
+    - name: Capture GitLab project URL
+      ansible.builtin.set_fact:
+        gitlab_project_url: >-
+          {{
+            created_project.json.web_url
+            if created_project is not skipped
+            else existing_project.web_url
+          }}
+
+    - name: Display project result
+      ansible.builtin.debug:
+        msg:
+          - "GitLab project {{ project_name }} is ready."
+          - "Project ID: {{ gitlab_project_id }}"
+          - "URL: {{ gitlab_project_url }}"
+
+    - name: Add requester as Developer to GitLab project
+      ansible.builtin.uri:
+        url: "{{ gitlab_api_url }}/projects/{{ gitlab_project_id }}/members"
+        method: POST
+        headers:
+          PRIVATE-TOKEN: "{{ gitlab_token }}"
+        body_format: form-urlencoded
+        body:
+          username: "{{ requester_username }}"
+          access_level: 30
+        return_content: true
+        status_code:
+          - 201
+          - 409
+      register: gitlab_member_result
+     # no_log: true
+
+    - name: Display requester access result
+      ansible.builtin.debug:
+        msg: >-
+          GitLab user {{ requester_username }} has been granted
+          Developer access to project {{ project_name }}.

@@ -1,0 +1,207 @@
+
+---
+# 1. Discover the completed Fedora Lane VPC.
+- name: Find Fedora Lane VPC
+  amazon.aws.ec2_vpc_net_info:
+    region: "{{ aws_region }}"
+    filters:
+      "tag:Project": "{{ project_name }}"
+      "tag:Name": "{{ vpc_name }}"
+  register: fedora_lane_vpc_lookup
+
+- name: Verify exactly one completed Fedora Lane VPC exists
+  ansible.builtin.assert:
+    that:
+      - fedora_lane_vpc_lookup.vpcs | length == 1
+      - >-
+        (fedora_lane_vpc_lookup.vpcs[0].tags |
+        default({})).get('FedoraLaneNetworkStatus', '') == 'complete'
+    fail_msg: >-
+      Fedora Lane VPC is missing, duplicated, or not marked complete.
+      Run the AWS network role first.
+
+# 2. Discover the public subnet.
+- name: Find Fedora Lane public subnet
+  amazon.aws.ec2_vpc_subnet_info:
+    region: "{{ aws_region }}"
+    filters:
+      vpc-id: "{{ fedora_lane_vpc_lookup.vpcs[0].vpc_id }}"
+      "tag:Name": "{{ subnet_name }}"
+  register: fedora_lane_subnet_lookup
+
+- name: Verify exactly one public subnet exists
+  ansible.builtin.assert:
+    that:
+      - fedora_lane_subnet_lookup.subnets | length == 1
+    fail_msg: >-
+      Expected exactly one Fedora Lane public subnet.
+
+# 3. Discover the Fedora Lane security group.
+- name: Find Fedora Lane security group
+  amazon.aws.ec2_security_group_info:
+    region: "{{ aws_region }}"
+    filters:
+      vpc-id: "{{ fedora_lane_vpc_lookup.vpcs[0].vpc_id }}"
+      group-name: "{{ security_group_name }}"
+  register: fedora_lane_sg_lookup
+
+- name: Verify exactly one security group exists
+  ansible.builtin.assert:
+    that:
+      - fedora_lane_sg_lookup.security_groups | length == 1
+    fail_msg: >-
+      Expected exactly one Fedora Lane security group.
+
+# 4. Validate the configured RHEL 10 AMI.
+- name: Find configured RHEL 10 AMI
+  amazon.aws.ec2_ami_info:
+    region: "{{ aws_region }}"
+    image_ids:
+      - "{{ aws_ami_id }}"
+  register: fedora_lane_ami_lookup
+
+- name: Validate the RHEL 10 AMI
+  ansible.builtin.assert:
+    that:
+      - fedora_lane_ami_lookup.images | length == 1
+      - fedora_lane_ami_lookup.images[0].state == 'available'
+      - fedora_lane_ami_lookup.images[0].architecture == 'x86_64'
+      - fedora_lane_ami_lookup.images[0].root_device_type == 'ebs'
+    fail_msg: >-
+      The configured AMI is unavailable or does not meet
+      the expected x86_64 EBS requirements.
+
+# 5. Validate the desired number of instances.
+- name: Validate desired instance count
+  ansible.builtin.assert:
+    that:
+      - aws_instance_count | int >= 1
+    fail_msg: aws_instance_count must be at least 1.
+
+# 6. Discover existing Fedora Lane instances.
+- name: Find existing Fedora Lane instances
+  amazon.aws.ec2_instance_info:
+    region: "{{ aws_region }}"
+    filters:
+      "tag:Project": "{{ project_name }}"
+      "tag:Environment": "{{ deployment_environment }}"
+      "tag:Name": "{{ aws_instance_name_prefix }}"
+      subnet-id: "{{ fedora_lane_subnet_lookup.subnets[0].subnet_id }}"
+      instance-state-name:
+        - pending
+        - running
+        - stopping
+        - stopped
+        - shutting-down
+  register: fedora_lane_instance_lookup
+
+# 7. Avoid creating more instances while existing ones are shutting down.
+- name: Verify existing instances are usable
+  ansible.builtin.assert:
+    that:
+      - >-
+        fedora_lane_instance_lookup.instances
+        | selectattr('state.name', 'equalto', 'shutting-down')
+        | list | length == 0
+      - >-
+        fedora_lane_instance_lookup.instances
+        | selectattr('state.name', 'equalto', 'stopping')
+        | list | length == 0
+    fail_msg: >-
+      Some Fedora Lane instances are stopping or shutting down.
+      Wait for their state to stabilize before provisioning.
+
+# 8. Calculate how many additional instances are required.
+- name: Calculate missing instance count
+  ansible.builtin.set_fact:
+    aws_instances_to_create: >-
+      {{
+        [
+          (aws_instance_count | int) -
+          (fedora_lane_instance_lookup.instances | length),
+          0
+        ] | max
+      }}
+
+- name: Report current fleet size
+  ansible.builtin.debug:
+    msg:
+      - "Desired instances: {{ aws_instance_count }}"
+      - "Existing instances: {{ fedora_lane_instance_lookup.instances | length }}"
+      - "Additional instances to create: {{ aws_instances_to_create }}"
+
+# 9. Launch only the missing instances.
+- name: Launch missing Fedora Lane RHEL 10 instances
+  amazon.aws.ec2_instance:
+    region: "{{ aws_region }}"
+    name: "{{ aws_instance_name_prefix }}"
+    image_id: "{{ aws_ami_id }}"
+    instance_type: "{{ aws_instance_type }}"
+    key_name: "{{ aws_key_pair_name }}"
+
+    # Explicitly select the Fedora Lane subnet.
+    vpc_subnet_id: "{{ fedora_lane_subnet_lookup.subnets[0].subnet_id }}"
+
+    network_interfaces:
+      - assign_public_ip: "{{ aws_assign_public_ip }}"
+        groups:
+          - "{{ fedora_lane_sg_lookup.security_groups[0].group_id }}"
+
+    volumes:
+      # Root EBS volume
+      - device_name: "{{ fedora_lane_ami_lookup.images[0].root_device_name }}"
+        ebs:
+          volume_size: "{{ aws_root_volume_size }}"
+          volume_type: "{{ aws_root_volume_type }}"
+          encrypted: true
+          delete_on_termination: true
+
+
+
+    tags: "{{ aws_resource_tags }}"
+    count: "{{ aws_instances_to_create | int }}"
+    state: "{{ aws_instance_state }}"
+    wait: true
+    wait_timeout: 600
+
+  register: fedora_lane_instances_created
+  when: aws_instances_to_create | int > 0
+
+# 10. Display newly created instances.
+- name: Display newly created Fedora Lane instances
+  ansible.builtin.debug:
+    msg: >-
+      Created instance {{ item.instance_id }}
+      | Public IP: {{ item.public_ip_address }}
+      | Private IP: {{ item.private_ip_address }}
+      | State: {{ item.state.name }}
+  loop: "{{ fedora_lane_instances_created.instances | default([]) }}"
+  when: aws_instances_to_create | int > 0
+
+# 11. Report when the desired count is already reached or exceeded.
+- name: Report that no additional instances are required
+  ansible.builtin.debug:
+    msg: >-
+      No instances created. Existing fleet contains
+      {{ fedora_lane_instance_lookup.instances | length }} instances.
+      Desired count is {{ aws_instance_count }}.
+      Existing instances will not be terminated automatically.
+  when: aws_instances_to_create | int == 0
+
+- name: Wait 2 minutes for EC2 instances and inventory to settle
+  ansible.builtin.pause:
+    minutes: 2
+
+- name: Add Fedora Lane EC2 instances to in-memory inventory
+  ansible.builtin.add_host:
+    name: "{{ item.instance_id }}"
+    groups: fedora_lane_config_targets
+    ansible_host: "{{ item.public_ip_address }}"
+    ansible_user: ec2-user
+    ansible_port: 2222
+  loop: >-
+    {{
+      fedora_lane_instance_lookup.instances
+      +
+      (fedora_lane_instances_created.instances | default([]))
+    }}

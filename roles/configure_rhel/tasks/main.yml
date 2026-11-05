@@ -1,0 +1,81 @@
+
+---
+- name: Validate Fedora Lane environment
+  ansible.builtin.assert:
+    that:
+      - fedoralane_vm_owner | length > 0
+      - fedoralane_vm_environment in ['dev', 'qa', 'production']
+    fail_msg: "Owner must be set and environment must be dev, qa, or production."
+
+- name: Create Fedora Lane groups
+  ansible.builtin.group:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - "{{ fedoralane_administrators_group }}"
+    - "{{ fedoralane_support_group }}"
+    - "{{ fedoralane_developers_group }}"
+
+- name: Create Fedora Lane sample users
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    groups: "{{ item.group }}"
+    append: true
+    shell: /bin/bash
+    create_home: true
+    state: present
+  loop: "{{ fedoralane_users }}"
+
+- name: Set Fedora Lane users passwords
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    password: "{{ item.password_hash }}"
+    update_password: always
+  loop:
+    - name: fedoralane-admin-user
+      password_hash: "{{ lane_admin_password_hash }}"
+    - name: fedoralane-support-user
+      password_hash: "{{ lane_support_password_hash }}"
+    - name: fedoralane-developer-user
+      password_hash: "{{ lane_developer_password_hash }}"
+  no_log: true
+
+- name: Install SSH authorized keys for Fedora Lane users
+  ansible.posix.authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ item.ssh_public_key }}"
+    state: present
+    exclusive: true
+  loop: "{{ fedoralane_users }}"
+  no_log: true
+
+
+- name: Configure SSH hardening
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/00-fedora-lane.conf
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      Port 2222
+      PermitRootLogin no
+      PasswordAuthentication no
+      PubkeyAuthentication yes
+  notify: Restart sshd
+
+- name: Configure Fedora Lane sudoers
+  ansible.builtin.template:
+    src: fedoralane-sudoers.j2
+    dest: /etc/sudoers.d/fedoralane
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Configure Fedora Lane MOTD
+  ansible.builtin.template:
+    src: fedoralane-motd.j2
+    dest: /etc/motd
+    owner: root
+    group: root
+    mode: "0644"

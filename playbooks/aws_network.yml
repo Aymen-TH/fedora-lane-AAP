@@ -1,0 +1,8 @@
+---
+- name: Provision Fedora Lane AWS network
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  roles:
+    - role: aws_network
