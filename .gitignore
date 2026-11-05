@@ -1,0 +1,21 @@
+# Ansible
+*.retry
+*.log
+artifacts/
+collections/
+roles_downloaded/
+
+# Secrets
+*.vault
+vault-password*
+.env
+
+# SSH private keys
+id_rsa
+id_ed25519
+*.pem
+
+# Python
+__pycache__/
+*.pyc
+.venv/
