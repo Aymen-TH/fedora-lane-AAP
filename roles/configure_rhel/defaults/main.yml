@@ -1,0 +1,33 @@
+---
+# Fedora Lane VM metadata
+fedoralane_vm_owner: "administrator"
+fedoralane_vm_environment: "dev"
+
+# Fedora Lane groups
+fedoralane_administrators_group: "fedoralane-administrators"
+fedoralane_support_group: "fedoralane-support"
+fedoralane_developers_group: "fedoralane-developers"
+
+# Sample accounts
+fedoralane_users:
+  - name: "fedoralane-admin-user"
+    group: "fedoralane-administrators"
+    ssh_public_key: "{{ lane_admin_public_key }}"
+    password_hash: "{{ lane_admin_password_hash }}"
+
+  - name: "fedoralane-support-user"
+    group: "fedoralane-support"
+    ssh_public_key: "{{ lane_support_public_key }}"
+    password_hash: "{{ lane_support_password_hash }}"
+
+  - name: "fedoralane-developer-user"
+    group: "fedoralane-developers"
+    ssh_public_key: "{{ lane_developer_public_key }}"
+    password_hash: "{{ lane_developer_password_hash }}"
+
+# Support may inspect logs and manage these services
+fedoralane_support_services:
+  - httpd
+  - sshd
+  - firewalld
+  - podman

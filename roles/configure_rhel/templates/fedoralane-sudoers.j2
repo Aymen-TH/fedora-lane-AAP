@@ -1,0 +1,28 @@
+
+# Fedora Lane administrators: unrestricted sudo, password required
+%fedoralane-administrators ALL=(ALL) ALL
+
+# Fedora Lane support: log inspection and limited service management
+Cmnd_Alias FEDORALANE_LOGS = /usr/bin/journalctl
+
+Cmnd_Alias FEDORALANE_SERVICE_MGMT = \
+    /usr/bin/systemctl status httpd, \
+    /usr/bin/systemctl restart httpd, \
+    /usr/bin/systemctl start httpd, \
+    /usr/bin/systemctl stop httpd, \
+    /usr/bin/systemctl status sshd, \
+    /usr/bin/systemctl restart sshd, \
+    /usr/bin/systemctl start sshd, \
+    /usr/bin/systemctl stop sshd, \
+    /usr/bin/systemctl status firewalld, \
+    /usr/bin/systemctl restart firewalld, \
+    /usr/bin/systemctl start firewalld, \
+    /usr/bin/systemctl stop firewalld, \
+    /usr/bin/systemctl status podman, \
+    /usr/bin/systemctl restart podman, \
+    /usr/bin/systemctl start podman, \
+    /usr/bin/systemctl stop podman
+
+%fedoralane-support ALL=(root) FEDORALANE_LOGS, FEDORALANE_SERVICE_MGMT
+
+# Fedora Lane developers intentionally have no sudo rule

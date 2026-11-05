@@ -1,0 +1,100 @@
+
+---
+- name: Send Fedora Lane onboarding welcome email
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    smtp_secure: "starttls"
+
+    smtp_username: "{{ lookup('env', 'SMTP_USERNAME') }}"
+    smtp_password: "{{ lookup('env', 'SMTP_PASSWORD') }}"
+
+    email_sender: "{{ smtp_username }}"
+
+    gitlab_namespace: "thabet.aymen1"
+
+    gitlab_project_url: >-
+      https://gitlab.com/{{ gitlab_namespace }}/{{ onboarding_project_path }}
+
+    application_db_user: >-
+      {{ requester_username | lower
+         | regex_replace('[^a-z0-9_]', '_')
+         | truncate(63, true, '') }}
+
+    postgres_server: "13.60.210.61"
+    postgres_port: 5432
+   
+
+  tasks:
+    - name: Ensure requester email is provided
+      ansible.builtin.assert:
+        that:
+          - requester_email is defined
+          - requester_email | length > 0
+        fail_msg: "Requester email is required."
+
+    - name: Send onboarding welcome email
+      community.general.mail:
+        host: "{{ smtp_host }}"
+        port: "{{ smtp_port }}"
+        secure: "{{ smtp_secure }}"
+        username: "{{ smtp_username }}"
+        password: "{{ smtp_password }}"
+        from: "{{ email_sender }}"
+        to: "{{ requester_email }}"
+        subject: "Fedora Lane - Your Application Onboarding Is Complete"
+        subtype: html
+        body: |
+          <html>
+          <body style="font-family: Arial, sans-serif; color: #333;">
+            <h2>Welcome aboard, {{ requester_username }}!</h2>
+
+            <p>
+              Your Fedora Lane application onboarding request has been
+              successfully completed.
+            </p>
+
+            <h3>GitLab Repository</h3>
+            <ul>
+              <li><strong>Project:</strong> {{ onboarding_project_name }}</li>
+              <li>
+                <strong>Repository:</strong>
+                <a href="{{ gitlab_project_url }}">{{ gitlab_project_url }}</a>
+              </li>
+              <li><strong>Access Level:</strong> Developer</li>
+            </ul>
+
+            <h3>PostgreSQL Database</h3>
+            <ul>
+              <li><strong>Database:</strong> {{ onboarding_db_name }}</li>
+              <li><strong>Database Username:</strong> {{ application_db_user }}</li>
+              <li><strong>Server:</strong> {{ postgres_server }}</li>
+              <li><strong>Port:</strong> {{ postgres_port }}</li>
+            </ul>
+
+            <p>
+              Your GitLab access has been granted, and your PostgreSQL
+              database is ready to use.
+            </p>
+
+            <p>
+              If you encounter any issues, please contact the Fedora Lane
+              platform team.
+            </p>
+
+            <p>
+              Best regards,<br>
+              <strong>Fedora Lane Automation Platform</strong>
+            </p>
+          </body>
+          </html>
+
+      no_log: true
+
+    - name: Confirm email delivery task completed
+      ansible.builtin.debug:
+        msg: "Welcome email sent to {{ requester_email }}."

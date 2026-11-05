@@ -1,0 +1,21 @@
+---
+# VPC
+aws_vpc_state: present
+
+# Subnet
+aws_subnet_map_public_ip: true
+
+# Internet Gateway
+aws_igw_state: present
+
+# Route table
+aws_route_table_state: present
+
+# Security Group
+aws_security_group_state: present
+
+# Outbound traffic
+aws_allow_all_egress: true
+
+# Temporary SSH access for initial RHEL provisioning
+aws_bootstrap_ssh_port: 22
